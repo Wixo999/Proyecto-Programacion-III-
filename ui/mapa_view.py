@@ -118,6 +118,97 @@ class MapaView(QWebEngineView):
 
 
     # =====================================================
+    # AGREGAR MARCADOR DE PEDIDO EN TIEMPO REAL
+    #
+    # Inyecta un nuevo circleMarker en capaPedidos sin
+    # recargar el mapa. Se llama desde panel_control.py
+    # justo despues de registrar un pedido nuevo.
+    #
+    # Si el nuevo pedido tiene la prioridad maxima actual,
+    # repinta todos los marcadores anteriores a steelblue
+    # para que solo el mas urgente quede en amarillo.
+    # =====================================================
+
+    def agregar_marcador_pedido(self, pedido):
+
+        from datos.pedidos import pedidos as lista_pedidos
+
+        # =================================================
+        # PRIORIDAD MAXIMA ACTUAL (incluye el nuevo)
+        # =================================================
+
+        prioridad_maxima = max(p.prioridad for p in lista_pedidos)
+
+        color = "yellow" if pedido.prioridad == prioridad_maxima else "steelblue"
+
+        # =================================================
+        # SI EL NUEVO ES EL MAS PRIORITARIO, REPINTAR
+        # TODOS LOS ANTERIORES A STEELBLUE
+        # =================================================
+
+        repintar_js = ""
+
+        if pedido.prioridad == prioridad_maxima:
+
+            repintar_js = """
+            capaPedidos.eachLayer(function(layer) {
+                if (layer.setStyle) {
+                    layer.setStyle({ color: 'steelblue', fillColor: 'steelblue' });
+                }
+            });
+            """
+
+        # =================================================
+        # ESCAPAR TEXTOS PARA JAVASCRIPT
+        # =================================================
+
+        cliente   = pedido.cliente.replace("'", "\\'")
+
+        direccion = pedido.direccion.replace("'", "\\'")
+
+        # =================================================
+        # JAVASCRIPT: AGREGAR NUEVO MARCADOR Y HACER ZOOM
+        # =================================================
+
+        js = f"""
+        (function() {{
+
+            {repintar_js}
+
+            var nuevoMarcador = L.circleMarker(
+
+                [{pedido.latitud}, {pedido.longitud}],
+
+                {{
+                    color:       '{color}',
+                    fillColor:   '{color}',
+                    fillOpacity: 1,
+                    radius:      8,
+                    weight:      2
+                }}
+            );
+
+            nuevoMarcador.bindPopup(
+                "<b>Pedido #{pedido.id_pedido}</b><br>" +
+                "Cliente: {cliente}<br>" +
+                "Zona: {direccion}<br>" +
+                "Prioridad: {pedido.prioridad}<br>" +
+                "Peso: {pedido.peso} kg"
+            );
+
+            nuevoMarcador.addTo(capaPedidos);
+
+            map.setView([{pedido.latitud}, {pedido.longitud}], 15);
+
+            nuevoMarcador.openPopup();
+
+        }})();
+        """
+
+        self.page().runJavaScript(js)
+
+
+    # =====================================================
     # DIBUJAR GRAFO EN EL MAPA
     #
     # Dibuja las calles (aristas) del grafo OSMnx
@@ -474,6 +565,84 @@ class MapaView(QWebEngineView):
 
         console.log("MOCHILA DIBUJADA");
 
+        """
+
+        self.page().runJavaScript(js)
+
+
+    # =====================================================
+    # ELIMINAR MARCADOR DE PEDIDO DEL MAPA
+    #
+    # Busca en capaPedidos el circleMarker cuyo popup
+    # contiene el id del pedido eliminado y lo remueve.
+    # Tambien recalcula cual es el nuevo pedido de mayor
+    # prioridad y lo repinta en amarillo.
+    # =====================================================
+
+    def eliminar_marcador_pedido(self, id_pedido):
+
+        from datos.pedidos import pedidos as lista_pedidos
+
+        # =================================================
+        # CALCULAR NUEVA PRIORIDAD MAXIMA TRAS ELIMINAR
+        # =================================================
+
+        if lista_pedidos:
+
+            nueva_prioridad_max = max(p.prioridad for p in lista_pedidos)
+
+        else:
+
+            nueva_prioridad_max = -1
+
+        # =================================================
+        # JAVASCRIPT:
+        # 1. Eliminar el marcador con ese id del popup
+        # 2. Repintar los restantes segun nueva prioridad
+        # =================================================
+
+        js = f"""
+        (function() {{
+
+            var aEliminar = null;
+
+            capaPedidos.eachLayer(function(layer) {{
+
+                if (
+                    layer.getPopup &&
+                    layer.getPopup() &&
+                    layer.getPopup().getContent().indexOf("Pedido #{id_pedido}<") !== -1
+                ) {{
+                    aEliminar = layer;
+                }}
+            }});
+
+            if (aEliminar) {{
+                capaPedidos.removeLayer(aEliminar);
+                console.log("Marcador pedido #{id_pedido} eliminado del mapa");
+            }}
+
+            capaPedidos.eachLayer(function(layer) {{
+
+                if (!layer.setStyle) return;
+
+                var contenido = layer.getPopup() ? layer.getPopup().getContent() : "";
+
+                var match = contenido.match(/Prioridad: (\\d+)/);
+
+                if (match) {{
+
+                    var prioridad = parseInt(match[1]);
+
+                    if (prioridad === {nueva_prioridad_max}) {{
+                        layer.setStyle({{ color: 'yellow', fillColor: 'yellow' }});
+                    }} else {{
+                        layer.setStyle({{ color: 'steelblue', fillColor: 'steelblue' }});
+                    }}
+                }}
+            }});
+
+        }})();
         """
 
         self.page().runJavaScript(js)

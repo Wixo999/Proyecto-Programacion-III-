@@ -151,6 +151,26 @@ def buscar_pedidos_por_sector(sector):
 
 
 # =========================================================
+# FUNCION ELIMINAR PEDIDO POR ID
+#
+# Retorna True si el pedido fue encontrado y eliminado,
+# False si no existe ningun pedido con ese id.
+# =========================================================
+
+def eliminar_pedido(id_pedido):
+
+    for i, pedido in enumerate(pedidos):
+
+        if pedido.id_pedido == id_pedido:
+
+            pedidos.pop(i)
+
+            return True
+
+    return False
+
+
+# =========================================================
 # FUNCION MOSTRAR PEDIDOS
 # =========================================================
 

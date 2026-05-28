@@ -7,11 +7,15 @@ from datos.repartidores import repartidores
 
 # =========================================================
 # CONFIGURACION DEL GRAFO
+#
+# Radio ampliado a 6000 m para cubrir toda la ciudad:
+# Wanchaq, San Sebastian, Santiago, Ttio, Magisterio
+# y zonas perifericas norte y sur de Cusco.
 # =========================================================
 
-CENTRO_CUSCO  = (-13.53195, -71.96746)
+CENTRO_CUSCO  = (-13.52264, -71.97234)
 
-RADIO_METROS  = 3000
+RADIO_METROS  = 6000
 
 TIPO_RED      = "drive"
 

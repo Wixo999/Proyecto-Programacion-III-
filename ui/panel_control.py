@@ -19,6 +19,7 @@ from datos.pedidos import (
     agregar_pedido,
     buscar_pedido,
     buscar_pedidos_por_sector,
+    eliminar_pedido,
     pedidos
 )
 
@@ -276,6 +277,40 @@ class PanelControl(QWidget):
 
         # =================================================
         # =================================================
+        # SECCION ELIMINAR PEDIDO
+        # =================================================
+        # =================================================
+
+        eliminar_group = QGroupBox("ELIMINAR PEDIDO")
+
+        eliminar_layout = QFormLayout()
+
+        eliminar_group.setLayout(eliminar_layout)
+
+        # =================================================
+        # CAMPO ID A ELIMINAR
+        # =================================================
+
+        self.input_id_eliminar = QLineEdit()
+
+        self.input_id_eliminar.setPlaceholderText("ID del pedido...")
+
+        eliminar_layout.addRow("ID:", self.input_id_eliminar)
+
+        # =================================================
+        # BOTON ELIMINAR
+        # =================================================
+
+        btn_eliminar = QPushButton("Eliminar Pedido")
+
+        btn_eliminar.clicked.connect(self.eliminar_pedido)
+
+        eliminar_layout.addRow(btn_eliminar)
+
+        layout.addWidget(eliminar_group)
+
+        # =================================================
+        # =================================================
         # SECCION ALGORITMOS
         # =================================================
         # =================================================
@@ -432,6 +467,17 @@ class PanelControl(QWidget):
 
             return
 
+        if latitud == 0.0 and longitud == 0.0:
+
+            QMessageBox.warning(
+                self,
+                "Error",
+                "Ingrese coordenadas válidas\n"
+                "(lat 0.0 / lon 0.0 cae en el océano)"
+            )
+
+            return
+
         nuevo_pedido = Pedido(
             self.id_actual_pedido,
             cliente,
@@ -458,6 +504,14 @@ class PanelControl(QWidget):
         print(nuevo_pedido.mostrar_info())
 
         self.id_actual_pedido += 1
+
+        # =================================================
+        # MOSTRAR EN EL MAPA EN TIEMPO REAL
+        # =================================================
+
+        if self.mapa is not None:
+
+            self.mapa.agregar_marcador_pedido(nuevo_pedido)
 
         # =================================================
         # LIMPIAR FORMULARIO
@@ -586,6 +640,103 @@ class PanelControl(QWidget):
                     for p in pedidos
                 ])
             )
+
+
+    # =====================================================
+    # ELIMINAR PEDIDO POR ID
+    # =====================================================
+
+    def eliminar_pedido(self):
+
+        texto = self.input_id_eliminar.text().strip()
+
+        if not texto:
+
+            QMessageBox.warning(
+                self,
+                "Error",
+                "Ingrese el ID del pedido a eliminar"
+            )
+
+            return
+
+        try:
+
+            id_pedido = int(texto)
+
+        except ValueError:
+
+            QMessageBox.warning(self, "Error", "El ID debe ser un número entero")
+
+            return
+
+        # =================================================
+        # CONFIRMAR ANTES DE ELIMINAR
+        # =================================================
+
+        pedido_encontrado = None
+
+        for p in pedidos:
+
+            if p.id_pedido == id_pedido:
+
+                pedido_encontrado = p
+
+                break
+
+        if pedido_encontrado is None:
+
+            QMessageBox.warning(
+                self,
+                "No encontrado",
+                f"No existe ningún pedido con ID {id_pedido}"
+            )
+
+            return
+
+        confirmacion = QMessageBox.question(
+            self,
+            "Confirmar eliminación",
+            f"¿Eliminar el pedido #{id_pedido}?\n\n"
+            f"Cliente:   {pedido_encontrado.cliente}\n"
+            f"Dirección: {pedido_encontrado.direccion}\n"
+            f"Prioridad: {pedido_encontrado.prioridad}\n"
+            f"Peso:      {pedido_encontrado.peso} kg",
+            QMessageBox.Yes | QMessageBox.No
+        )
+
+        if confirmacion != QMessageBox.Yes:
+
+            return
+
+        # =================================================
+        # ELIMINAR DE LA LISTA
+        # =================================================
+
+        eliminar_pedido(id_pedido)
+
+        print(f"PEDIDO ELIMINADO: ID {id_pedido} — {pedido_encontrado.cliente}")
+
+        # =================================================
+        # ELIMINAR MARCADOR DEL MAPA EN TIEMPO REAL
+        # =================================================
+
+        if self.mapa is not None:
+
+            self.mapa.eliminar_marcador_pedido(id_pedido)
+
+        # =================================================
+        # LIMPIAR CAMPO
+        # =================================================
+
+        self.input_id_eliminar.clear()
+
+        QMessageBox.information(
+            self,
+            "Pedido Eliminado",
+            f"El pedido #{id_pedido} de {pedido_encontrado.cliente} "
+            f"fue eliminado correctamente."
+        )
 
 
     # =====================================================
